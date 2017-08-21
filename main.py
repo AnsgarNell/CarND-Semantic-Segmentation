@@ -56,16 +56,17 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
 	"""
 	# TODO: Implement function
 	vgg_1x1_convolution = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1))
-	vgg_layer7_transposed = tf.layers.conv2d_transpose(vgg_1x1_convolution, num_classes, 4, strides=(2, 2))
 	
-	# make sure the shapes are the same!
-	vgg_layer4_transposed = tf.add(vgg_layer7_transposed, vgg_layer4_out)
-	vgg_layer4_transposed = tf.layers.conv2d_transpose(vgg_layer4_transposed, num_classes, 4, strides=(2, 2))
+	decoder_layer1 = tf.layers.conv2d_transpose(vgg_1x1_convolution, 3, (2, 2), (2, 2))
+	decoder_layer1 = tf.add(decoder_layer1, vgg_layer3_out)
 	
-	vgg_layer3_transposed = tf.add(vgg_layer4_transposed, vgg_layer3_out)
-	vgg_layer3_transposed = tf.layers.conv2d_transpose(vgg_layer3_transposed, num_classes, 4, strides=(2, 2))
+	decoder_layer2 = tf.layers.conv2d_transpose(decoder_layer1, 3, (2, 2), (2, 2))
+	decoder_layer2 = tf.add(decoder_layer2, vgg_layer4_out)
 	
-	return vgg_layer3_transposed
+	decoder_layer3 = tf.layers.conv2d_transpose(decoder_layer2, 3, (2, 2), (2, 2))
+	decoder_layer3 = tf.add(decoder_layer3, vgg_layer7_out)
+	
+	return decoder_layer3
 tests.test_layers(layers)
 
 
@@ -128,7 +129,8 @@ def run():
 
 		# TODO: Build NN using load_vgg, layers, and optimize function
 		
-		image_input, keep_prob, layer3_out, layer4_out, layer7_out = load_vgg(sess, vgg_path)
+		image_input, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
+		output = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
 
 		# TODO: Train NN using the train_nn function
 
