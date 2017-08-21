@@ -57,8 +57,13 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
 	# TODO: Implement function
 	vgg_1x1_convolution = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1))
 	vgg_layer7_transposed = tf.layers.conv2d_transpose(vgg_1x1_convolution, num_classes, 4, strides=(2, 2))
-	vgg_layer4_transposed = tf.layers.conv2d_transpose(vgg_layer7_transposed, num_classes, 4, strides=(2, 2))
-	vgg_layer3_transposed = tf.layers.conv2d_transpose(vgg_layer4_transposed, num_classes, 4, strides=(2, 2))
+	
+	# make sure the shapes are the same!
+	vgg_layer4_transposed = tf.add(vgg_layer7_transposed, vgg_layer4_out)
+	vgg_layer4_transposed = tf.layers.conv2d_transpose(vgg_layer4_transposed, num_classes, 4, strides=(2, 2))
+	
+	vgg_layer3_transposed = tf.add(vgg_layer4_transposed, vgg_layer3_out)
+	vgg_layer3_transposed = tf.layers.conv2d_transpose(vgg_layer3_transposed, num_classes, 4, strides=(2, 2))
 	
 	return vgg_layer3_transposed
 tests.test_layers(layers)
