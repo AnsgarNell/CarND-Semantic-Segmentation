@@ -15,6 +15,20 @@ if not tf.test.gpu_device_name():
 	warnings.warn('No GPU found. Please use a GPU to train your neural network.')
 else:
 	print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+	
+# Set the `kernel_size` and `stride`.
+def conv_1x1(x, num_outputs):
+	kernel_size = 1
+	stride = 1
+	return tf.layers.conv2d(x, num_outputs, kernel_size, stride)
+	
+def upsample(x):
+	"""
+	Apply a two times upsample on x and return the result.
+	:x: 4-Rank Tensor
+	:return: TF Operation
+	"""
+	return tf.layers.conv2d_transpose(x, 2, (2,2), (2,2))
 
 
 def load_vgg(sess, vgg_path):
@@ -55,18 +69,21 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
 	:return: The Tensor for the last layer of output
 	"""
 	# TODO: Implement function
-	vgg_1x1_convolution = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1))
+	vgg_1x1_convolution = conv_1x1(vgg_layer7_out, num_classes)
 	
-	decoder_layer1 = tf.layers.conv2d_transpose(vgg_1x1_convolution, 3, (2, 2), (2, 2))
-	decoder_layer1 = tf.add(decoder_layer1, vgg_layer3_out)
+	decoder_layer7_T = upsample(vgg_1x1_convolution)
+	vgg_layer7_logits = tf.layers.conv2d(vgg_layer7_out, num_classes, kernel_size=1)
+	decoder_layer7_T = tf.add(decoder_layer7_T, vgg_layer7_logits)
 	
-	decoder_layer2 = tf.layers.conv2d_transpose(decoder_layer1, 3, (2, 2), (2, 2))
-	decoder_layer2 = tf.add(decoder_layer2, vgg_layer4_out)
+	decoder_layer4_T = upsample(decoder_layer7_T)
+	vgg_layer4_logits = tf.layers.conv2d(vgg_layer4_out, num_classes, kernel_size=1)
+	decoder_layer4_T = tf.add(decoder_layer4_T, vgg_layer4_logits)
 	
-	decoder_layer3 = tf.layers.conv2d_transpose(decoder_layer2, 3, (2, 2), (2, 2))
-	decoder_layer3 = tf.add(decoder_layer3, vgg_layer7_out)
+	decoder_layer3_T = upsample(decoder_layer4_T)
+	vgg_layer3_logits = tf.layers.conv2d(vgg_layer3_out, num_classes, kernel_size=1)
+	decoder_layer3_T = tf.add(decoder_layer3_T, vgg_layer3_logits)
 	
-	return decoder_layer3
+	return decoder_layer3_T
 tests.test_layers(layers)
 
 
