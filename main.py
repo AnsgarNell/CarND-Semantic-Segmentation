@@ -28,7 +28,7 @@ def upsample(x, kernel_size, strides):
 	:x: 4-Rank Tensor
 	:return: TF Operation
 	"""
-	return tf.layers.conv2d_transpose(x, 2, kernel_size, strides)
+	return tf.layers.conv2d_transpose(x, 2, kernel_size, strides, padding='same')
 
 
 def load_vgg(sess, vgg_path):
@@ -68,8 +68,9 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
 	:param num_classes: Number of classes to classify
 	:return: The Tensor for the last layer of output
 	"""
-	"""
 	# TODO: Implement function
+	# Inspired in https://github.com/diyjac/SDC-T3-P3/blob/master/main.py
+	
 	vgg_1x1_convolution = conv_1x1(vgg_layer7_out, num_classes)
 	fcn_decoder_layer1 = upsample(vgg_1x1_convolution, kernel_size=4, strides=(2, 2))
 	
@@ -83,40 +84,6 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
 	
 	fcn_decoder_output = upsample(fcn_decoder_layer4, kernel_size=16, strides=(8, 8))
 
-	return fcn_decoder_output
-	"""
-		# making sure the resulting shape are the same
-	vgg_layer7_logits = tf.layers.conv2d(
-		vgg_layer7_out, num_classes, kernel_size=1, name='vgg_layer7_logits')
-	vgg_layer4_logits = tf.layers.conv2d(
-		vgg_layer4_out, num_classes, kernel_size=1, name='vgg_layer4_logits')
-	vgg_layer3_logits = tf.layers.conv2d(
-		vgg_layer3_out, num_classes, kernel_size=1, name='vgg_layer3_logits')
-
-	# Let’s implement those transposed convolutions we discussed earlier
-	# as follows:
-	fcn_decoder_layer1 = tf.layers.conv2d_transpose(
-		vgg_layer7_logits, num_classes, kernel_size=4, strides=(2, 2),
-		padding='same', name='fcn_decoder_layer1')
-
-	# Then we add the first skip connection from the vgg_layer4_out
-	fcn_decoder_layer2 = tf.add(
-		fcn_decoder_layer1, vgg_layer4_logits, name='fcn_decoder_layer2')
-
-	# We can then follow this with another transposed convolution layer
-	# making sure the resulting shape are the same as layer3
-	fcn_decoder_layer3 = tf.layers.conv2d_transpose(
-		fcn_decoder_layer2, num_classes, kernel_size=4, strides=(2, 2),
-		padding='same', name='fcn_decoder_layer3')
-
-	# We’ll repeat this once more with the third pooling layer output.
-	fcn_decoder_layer4 = tf.add(
-		fcn_decoder_layer3, vgg_layer3_logits, name='fcn_decoder_layer4')
-	fcn_decoder_output = tf.layers.conv2d_transpose(
-		fcn_decoder_layer4, num_classes, kernel_size=16, strides=(8, 8),
-		padding='same', name='fcn_decoder_layer4')
-
-	# return the final fcn output
 	return fcn_decoder_output
 tests.test_layers(layers)
 
@@ -188,8 +155,8 @@ def run():
 	
 	# Hyperparameters
 	learning_rate = tf.constant(0.0001)
-	epochs = 20
-	batch_size = 1
+	epochs = 30
+	batch_size = 128
 
 	# Download pretrained vgg model
 	helper.maybe_download_pretrained_vgg(data_dir)
