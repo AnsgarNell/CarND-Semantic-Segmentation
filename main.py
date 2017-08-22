@@ -72,15 +72,15 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
 	vgg_1x1_convolution = conv_1x1(vgg_layer7_out, num_classes)
 	
 	decoder_layer7_T = upsample(vgg_1x1_convolution)
-	vgg_layer7_logits = tf.layers.conv2d(vgg_layer7_out, num_classes, kernel_size=1)
+	vgg_layer7_logits = conv_1x1(vgg_layer7_out, num_classes)
 	decoder_layer7_T = tf.add(decoder_layer7_T, vgg_layer7_logits)
 	
 	decoder_layer4_T = upsample(decoder_layer7_T)
-	vgg_layer4_logits = tf.layers.conv2d(vgg_layer4_out, num_classes, kernel_size=1)
+	vgg_layer4_logits = conv_1x1(vgg_layer4_out, num_classes)
 	decoder_layer4_T = tf.add(decoder_layer4_T, vgg_layer4_logits)
 	
 	decoder_layer3_T = upsample(decoder_layer4_T)
-	vgg_layer3_logits = tf.layers.conv2d(vgg_layer3_out, num_classes, kernel_size=1)
+	vgg_layer3_logits = conv_1x1(vgg_layer3_out, num_classes)
 	decoder_layer3_T = tf.add(decoder_layer3_T, vgg_layer3_logits)
 	
 	return decoder_layer3_T
@@ -97,8 +97,16 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
 	:return: Tuple of (logits, train_op, cross_entropy_loss)
 	"""
 	# TODO: Implement function
-	return None, None, None
-#tests.test_optimize(optimize)
+	logits = tf.reshape(nn_last_layer, (-1, num_classes))
+	labels = tf.reshape(correct_label, (-1, num_classes))
+	
+	cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=labels, logits=logits)
+	cross_entropy_loss = tf.reduce_mean(cross_entropy)
+	optimizer = tf.train.AdamOptimizer(learning_rate)
+	train_op = optimizer.minimize(cross_entropy_loss)
+		
+	return logits, train_op, cross_entropy_loss
+tests.test_optimize(optimize)
 
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
@@ -127,6 +135,9 @@ def run():
 	data_dir = './data'
 	runs_dir = './runs'
 	tests.test_for_kitti_dataset(data_dir)
+	
+	# Hyperparameters
+	learning_rate = tf.constant(0.0001)
 
 	# Download pretrained vgg model
 	helper.maybe_download_pretrained_vgg(data_dir)
@@ -147,7 +158,12 @@ def run():
 		# TODO: Build NN using load_vgg, layers, and optimize function
 		
 		image_input, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
-		output = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
+		nn_last_layer = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
+		
+		shape = [None, image_shape[0], image_shape[1], 3]
+		correct_label = tf.placeholder(tf.float32, [None, image_shape[0], image_shape[1], num_classes])
+		
+		logits, train_op, cross_entropy_loss = optimize(nn_last_layer, correct_label, learning_rate, num_classes)
 
 		# TODO: Train NN using the train_nn function
 
