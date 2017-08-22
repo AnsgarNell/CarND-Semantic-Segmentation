@@ -155,8 +155,8 @@ def run():
 	
 	# Hyperparameters
 	learning_rate = tf.constant(0.0001)
-	epochs = 30
-	batch_size = 10
+	epochs = 25
+	batch_size = 1
 
 	# Download pretrained vgg model
 	helper.maybe_download_pretrained_vgg(data_dir)
@@ -179,8 +179,7 @@ def run():
 		input_image, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
 		nn_last_layer = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
 		
-		shape = [None, image_shape[0], image_shape[1], 3]
-		correct_label = tf.placeholder(tf.float32, [None, image_shape[0], image_shape[1], num_classes])
+		correct_label = tf.placeholder(tf.int32, (None, image_shape[0], image_shape[1], num_classes))
 		
 		logits, train_op, cross_entropy_loss = optimize(nn_last_layer, correct_label, learning_rate, num_classes)
 
