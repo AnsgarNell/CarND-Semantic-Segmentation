@@ -22,13 +22,13 @@ def conv_1x1(x, num_outputs):
 	stride = 1
 	return tf.layers.conv2d(x, num_outputs, kernel_size, stride)
 	
-def upsample(x):
+def upsample(x, kernel_size, strides):
 	"""
 	Apply a two times upsample on x and return the result.
 	:x: 4-Rank Tensor
 	:return: TF Operation
 	"""
-	return tf.layers.conv2d_transpose(x, 2, (2,2), (2,2))
+	return tf.layers.conv2d_transpose(x, 2, kernel_size, strides)
 
 
 def load_vgg(sess, vgg_path):
@@ -68,22 +68,56 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
 	:param num_classes: Number of classes to classify
 	:return: The Tensor for the last layer of output
 	"""
+	"""
 	# TODO: Implement function
 	vgg_1x1_convolution = conv_1x1(vgg_layer7_out, num_classes)
+	fcn_decoder_layer1 = upsample(vgg_1x1_convolution, kernel_size=4, strides=(2, 2))
 	
-	decoder_layer7_T = upsample(vgg_1x1_convolution)
-	vgg_layer7_logits = conv_1x1(vgg_layer7_out, num_classes)
-	decoder_layer7_T = tf.add(decoder_layer7_T, vgg_layer7_logits)
-	
-	decoder_layer4_T = upsample(decoder_layer7_T)
 	vgg_layer4_logits = conv_1x1(vgg_layer4_out, num_classes)
-	decoder_layer4_T = tf.add(decoder_layer4_T, vgg_layer4_logits)
+	fcn_decoder_layer2 = tf.add(fcn_decoder_layer1, vgg_layer4_logits)
 	
-	decoder_layer3_T = upsample(decoder_layer4_T)
+	fcn_decoder_layer3 = upsample(fcn_decoder_layer2, kernel_size=4, strides=(2, 2))
+
 	vgg_layer3_logits = conv_1x1(vgg_layer3_out, num_classes)
-	decoder_layer3_T = tf.add(decoder_layer3_T, vgg_layer3_logits)
+	fcn_decoder_layer4 = tf.add(fcn_decoder_layer3, vgg_layer3_logits)
 	
-	return decoder_layer3_T
+	fcn_decoder_output = upsample(fcn_decoder_layer4, kernel_size=16, strides=(8, 8))
+
+	return fcn_decoder_output
+	"""
+		# making sure the resulting shape are the same
+	vgg_layer7_logits = tf.layers.conv2d(
+		vgg_layer7_out, num_classes, kernel_size=1, name='vgg_layer7_logits')
+	vgg_layer4_logits = tf.layers.conv2d(
+		vgg_layer4_out, num_classes, kernel_size=1, name='vgg_layer4_logits')
+	vgg_layer3_logits = tf.layers.conv2d(
+		vgg_layer3_out, num_classes, kernel_size=1, name='vgg_layer3_logits')
+
+	# Let’s implement those transposed convolutions we discussed earlier
+	# as follows:
+	fcn_decoder_layer1 = tf.layers.conv2d_transpose(
+		vgg_layer7_logits, num_classes, kernel_size=4, strides=(2, 2),
+		padding='same', name='fcn_decoder_layer1')
+
+	# Then we add the first skip connection from the vgg_layer4_out
+	fcn_decoder_layer2 = tf.add(
+		fcn_decoder_layer1, vgg_layer4_logits, name='fcn_decoder_layer2')
+
+	# We can then follow this with another transposed convolution layer
+	# making sure the resulting shape are the same as layer3
+	fcn_decoder_layer3 = tf.layers.conv2d_transpose(
+		fcn_decoder_layer2, num_classes, kernel_size=4, strides=(2, 2),
+		padding='same', name='fcn_decoder_layer3')
+
+	# We’ll repeat this once more with the third pooling layer output.
+	fcn_decoder_layer4 = tf.add(
+		fcn_decoder_layer3, vgg_layer3_logits, name='fcn_decoder_layer4')
+	fcn_decoder_output = tf.layers.conv2d_transpose(
+		fcn_decoder_layer4, num_classes, kernel_size=16, strides=(8, 8),
+		padding='same', name='fcn_decoder_layer4')
+
+	# return the final fcn output
+	return fcn_decoder_output
 tests.test_layers(layers)
 
 
@@ -125,8 +159,24 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 	:param learning_rate: TF Placeholder for learning rate
 	"""
 	# TODO: Implement function
-	pass
-#tests.test_train_nn(train_nn)
+	sess.run(tf.global_variables_initializer())
+	for i in range(epochs):		
+		
+		training_loss = 0
+		training_samples = 0
+		print("running epochs:", i)
+	
+		# train on batches
+		for X, y in get_batches_fn(batch_size):
+			training_samples += len(X)
+			loss, _ = sess.run([cross_entropy_loss, train_op], feed_dict={input_image: X, correct_label: y, keep_prob: 0.7})	
+			training_loss += loss
+			
+		# calculate training loss
+		training_loss /= training_samples
+		print("epoch {} with training loss: {}".format(i, training_loss))
+			
+tests.test_train_nn(train_nn)
 
 
 def run():
@@ -138,6 +188,8 @@ def run():
 	
 	# Hyperparameters
 	learning_rate = tf.constant(0.0001)
+	epochs = 20
+	batch_size = 1
 
 	# Download pretrained vgg model
 	helper.maybe_download_pretrained_vgg(data_dir)
@@ -157,7 +209,7 @@ def run():
 
 		# TODO: Build NN using load_vgg, layers, and optimize function
 		
-		image_input, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
+		input_image, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
 		nn_last_layer = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
 		
 		shape = [None, image_shape[0], image_shape[1], 3]
@@ -166,9 +218,11 @@ def run():
 		logits, train_op, cross_entropy_loss = optimize(nn_last_layer, correct_label, learning_rate, num_classes)
 
 		# TODO: Train NN using the train_nn function
+		train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
+			 correct_label, keep_prob, learning_rate)
 
 		# TODO: Save inference data using helper.save_inference_samples
-		#  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+		helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
 		# OPTIONAL: Apply the trained model to a video
 
