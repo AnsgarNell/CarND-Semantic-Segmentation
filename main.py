@@ -155,7 +155,7 @@ def run():
 	
 	# Hyperparameters
 	learning_rate = tf.constant(0.0001)
-	epochs = 25
+	epochs = 30
 	batch_size = 1
 
 	# Download pretrained vgg model
